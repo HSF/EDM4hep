@@ -6,6 +6,8 @@
 #include "edm4hep/SimTrackerHitCollection.h"
 #include "edm4hep/CaloHitContributionCollection.h"
 #include "edm4hep/SimCalorimeterHitCollection.h"
+#include "edm4hep/UserFloatCollection.h"
+#include "edm4hep/UserExtCollection.h"
 
 // podio specific includes
 #include "podio/EventStore.h"
@@ -16,12 +18,17 @@
 #include <exception>
 #include <cassert>
 
+#include "ud.h"
+
 void processEvent(podio::EventStore& store, bool verboser, unsigned eventNum) {
   auto& mcps   = store.get<edm4hep::MCParticleCollection>("MCParticles");
   auto& sths   = store.get<edm4hep::SimTrackerHitCollection>("SimTrackerHits");
   auto& schs   = store.get<edm4hep::SimCalorimeterHitCollection>("SimCalorimeterHits");
   auto& sccons = store.get<edm4hep::CaloHitContributionCollection>("SimCalorimeterHitContributions");
+  auto& usrflts = store.get<edm4hep::UserFloatCollection>("UserFloats");
 
+  auto& usrexts = store.get<edm4hep::UserExtCollection>("UserExts");
+  auto& usrexts2 = store.get<edm4hep::UserExtCollection>("SecondUserExts");
 
   if( mcps.isValid() ){
 
@@ -60,6 +67,27 @@ void processEvent(podio::EventStore& store, bool verboser, unsigned eventNum) {
     auto mcp2 = mcps[1] ;
     if( mcp2.getGeneratorStatus() != 3 ) throw std::runtime_error("wrong genStat for 2. particle - should be 3" );
     // and so on ...
+
+
+    // check user float data for MCParticles
+    int nmcp = mcps.size() ;
+    int nflts = usrflts.size() ;
+
+    if( nmcp != nflts ) throw std::runtime_error("number of user floats not equal to number of MCParticles");
+
+    for(int i=0 ; i<nmcp ; ++i){
+
+      auto pv = mcps[i].getMomentum() ;
+
+      float pp = sqrt( pv[0] * pv[0] +  pv[1] * pv[1] +  pv[2] * pv[2] );
+
+      float upp = usrflts[i].getValue() ;
+
+      if( pp != upp ){
+	std::cout << " incorrect user momentum stored: " << upp << " should be pp " << std::endl ;
+	throw std::runtime_error(" test failed...") ;
+      }
+    }
 
   } else {
     throw std::runtime_error("Collection 'MCParticles' should be present");
@@ -153,6 +181,81 @@ void processEvent(podio::EventStore& store, bool verboser, unsigned eventNum) {
     throw std::runtime_error("Collection 'SimCalorimeterHits' should be present");
   }
 
+  ud xyzi;
+  xyzi.reg("x", 1, 0)
+      .reg("y", 1, 1)
+      .reg("z", 1, 2)
+      .reg("t", 2, 0)
+      .reg("i", 0, 0);
+
+  if (usrexts.isValid()) {
+      int nusrexts = usrexts.size();
+
+      std::cout << "User data summary: " << std::endl;
+      for (int i = 0; i < nusrexts; ++i) {
+
+          float x,y,z;
+          double t;
+          int iii;
+          
+          xyzi.from(usrexts[i], 0)
+              .get("x", x)
+              .get("y", y)
+              .get("z", z)
+              .get("t", t)
+              .get("i", iii);
+          
+          // int ix = 0;
+          // int iy = 1;
+          // int iz = 2;
+          // int ii = 0;
+          // float x = usrexts[i].getValF(ix);
+          // float y = usrexts[i].getValF(iy);
+          // float z = usrexts[i].getValF(iz);
+          // int iii = usrexts[i].getValI(ii);
+          std::cout << "User Ext: "
+                    << i << " " << iii
+                    << " " << x << " " << y << " " << z << " " << t
+                    << std::endl;
+      }
+  }
+  
+  if (usrexts2.isValid()) {
+      int nusrexts2 = usrexts2.size();
+
+      // need to know the length of the array
+      std::cout << "SecondUserExts summary: "
+                << "(size: " << nusrexts2 << ")" << std::endl;
+      // loop all the values
+      for (int i = 0; i < 10; ++i) {
+
+          float x,y,z;
+          double t;
+          int iii;
+          
+          xyzi.from(usrexts2[0], i)
+              .get("x", x)
+              .get("y", y)
+              .get("z", z)
+              .get("t", t)
+              .get("i", iii);
+
+          // int ix = i*3 + 0;
+          // int iy = i*3 + 1;
+          // int iz = i*3 + 2;
+          // int ii = i;
+
+          // float x = usrexts2[0].getValF(ix);
+          // float y = usrexts2[0].getValF(iy);
+          // float z = usrexts2[0].getValF(iz);
+          // int iii = usrexts2[0].getValI(ii);
+          std::cout << "Second User Ext: "
+                    << i << " " << iii
+                    << " " << x << " " << y << " " << z << " " << t
+                    << std::endl;
+      }
+  }
+  
  // //===============================================================================
  //  if( sccons.isValid() ){
  //  } else {

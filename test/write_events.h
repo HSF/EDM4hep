@@ -6,6 +6,9 @@
 #include "edm4hep/SimTrackerHitCollection.h"
 #include "edm4hep/CaloHitContributionCollection.h"
 #include "edm4hep/SimCalorimeterHitCollection.h"
+#include "edm4hep/SimCalorimeterHitCollection.h"
+#include "edm4hep/UserFloatCollection.h"
+#include "edm4hep/UserExtCollection.h"
 
 // STL
 #include <iostream>
@@ -13,6 +16,8 @@
 
 // podio specific includes
 #include "podio/EventStore.h"
+
+#include "ud.h"
 
 template<class WriterT>
 void write(std::string outfilename) {
@@ -33,6 +38,15 @@ void write(std::string outfilename) {
 
   auto& sccons = store.create<edm4hep::CaloHitContributionCollection>("SimCalorimeterHitContributions");
   writer.registerForWrite("SimCalorimeterHitContributions");
+
+  auto& usrflts  = store.create<edm4hep::UserFloatCollection>("UserFloats");
+  writer.registerForWrite("UserFloats");
+
+  auto& usrexts  = store.create<edm4hep::UserExtCollection>("UserExts");
+  writer.registerForWrite("UserExts");
+
+  auto& usrexts2  = store.create<edm4hep::UserExtCollection>("SecondUserExts");
+  writer.registerForWrite("SecondUserExts");
 
 
   unsigned nevents = 10 ;
@@ -124,6 +138,19 @@ void write(std::string outfilename) {
     //-------------------------------------------------------------
 
 
+    //----  add a user float value per MCParticle as 'user data'
+
+    for( auto p : mcps ){
+
+      auto ufv =  usrflts.create();
+
+      auto pv = p.getMomentum() ;
+
+      float pp = sqrt( pv[0] * pv[0] +  pv[1] * pv[1] +  pv[2] * pv[2] );
+
+      ufv.setValue( pp  ) ;
+    }
+
     //-------- print particles for debugging:
     std::cout << "\n collection:  " << "MCParticles" <<  " of type " <<  mcps.getValueTypeName() << "\n\n"
         << mcps << std::endl ;
@@ -180,6 +207,73 @@ void write(std::string outfilename) {
 
     std::cout << "\n collection:  " << "SimCalorimeterHits" <<  " of type " <<  schs.getValueTypeName() << "\n\n"
         << schs << std::endl ;
+
+
+
+    //===============================================================================
+    // Usage 1: each element is a user ext data
+    // write some User Defined Type Data
+    // - save 10 elements
+    // - each element contains x/y/z (float) and i (int)
+
+    ud xyzi;
+    xyzi.reg("x", 1, 0)
+        .reg("y", 1, 1)
+        .reg("z", 1, 2)
+        .reg("t", 2, 0)
+        .reg("i", 0, 0);
+
+    for (int i = 0; i < 10; ++i) {
+        float x = 1.0;
+        float y = 2.0;
+        float z = 3.0;
+        double t = 0.01*i;
+
+        xyzi.put("x", x)
+            .put("y", y)
+            .put("z", z)
+            .put("t", t)
+            .put("i", i);
+        
+        auto udv = usrexts.create();
+
+        xyzi.to(udv);
+        
+        // push some value to this x/y/z/i
+        // udv.addToValF(x);
+        // udv.addToValF(y);
+        // udv.addToValF(z);
+        // udv.addToValI(i);
+    }
+
+    // Usage 2: only create one user defined type data
+    //          then push the values into this container
+    auto udv2 = usrexts2.create();
+
+
+    for (int i = 0; i < 10; ++i) {
+        float x = 1.0;
+        float y = 2.0;
+        float z = 3.0;
+        double t = 0.01*i;
+
+        xyzi.put("x", x)
+            .put("y", y)
+            .put("z", z)
+            .put("t", t)
+            .put("i", i);
+
+        xyzi.to(udv2);
+
+        
+        // // push some value to this x/y/z/i
+        // udv2.addToValF(x);
+        // udv2.addToValF(y);
+        // udv2.addToValF(z);
+        // udv2.addToValI(i);
+        
+    }
+
 
     //===============================================================================
 
